@@ -1,1 +1,0 @@
-#template-mikrotik-actual-version
