@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<zabbix_export>
+    <version>4.4</version>
+    <date>2020-06-17T19:17:15Z</date>
+    <groups>
+        <group>
+            <name>Templates/Applications</name>
+        </group>
+    </groups>
+    <templates>
+        <template>
+            <template>Mikrotik - Actual Version</template>
+            <name>Mikrotik - Actual Version</name>
+            <description>Template install&#13;
+1) Create two macros by host:&#13;
+{$HOST_ID} - Set ID host&#13;
+{$MIKROTIK_LTS} - empty&#13;
+&#13;
+Author: Stanislav Yaroshevskiy 1@3sla.ru</description>
+            <groups>
+                <group>
+                    <name>Templates/Applications</name>
+                </group>
+            </groups>
+            <applications>
+                <application>
+                    <name>AMI</name>
+                </application>
+            </applications>
+            <httptests>
+                <httptest>
+                    <name>Mikrotik - Actual Version</name>
+                    <application>
+                        <name>AMI</name>
+                    </application>
+                    <delay>30s</delay>
+                    <steps>
+                        <step>
+                            <name>Mikrotik - Get Actual Version</name>
+                            <url>https://upgrade.mikrotik.com/routeros/LATEST.6fix</url>
+                            <variables>
+                                <variable>
+                                    <name>{mikrotik_version}</name>
+                                    <value>regex:^([\d\.]+)</value>
+                                </variable>
+                            </variables>
+                            <follow_redirects>NO</follow_redirects>
+                            <timeout>3s</timeout>
+                        </step>
+                        <step>
+                            <name>Zabbix API - Getting Session ID</name>
+                            <url>{$ZABBIX_API_URL}</url>
+                            <posts>{&#13;
+    &quot;jsonrpc&quot;: &quot;2.0&quot;,&#13;
+    &quot;method&quot;: &quot;user.login&quot;,&#13;
+    &quot;params&quot;: {&#13;
+        &quot;user&quot;: &quot;{$ZABBIX_API_LOGIN}&quot;,&#13;
+        &quot;password&quot;: &quot;{$ZABBIX_API_PASSWORD}&quot;&#13;
+    },&#13;
+    &quot;id&quot;: 1,&#13;
+    &quot;auth&quot;: null&#13;
+}</posts>
+                            <variables>
+                                <variable>
+                                    <name>{sid}</name>
+                                    <value>regex:([0-9A-z]{32})</value>
+                                </variable>
+                            </variables>
+                            <headers>
+                                <header>
+                                    <name>Content-Type</name>
+                                    <value>application/json-rpc</value>
+                                </header>
+                            </headers>
+                            <follow_redirects>NO</follow_redirects>
+                            <timeout>3s</timeout>
+                            <required>result</required>
+                        </step>
+                        <step>
+                            <name>Zabbix API - Macro ID search</name>
+                            <url>{$ZABBIX_API_URL}</url>
+                            <posts>{&#13;
+    &quot;jsonrpc&quot;:&quot;2.0&quot;,&#13;
+    &quot;method&quot;:&quot;usermacro.get&quot;,&#13;
+    &quot;params&quot;:{&#13;
+        &quot;output&quot;:&quot;extend&quot;,&#13;
+        &quot;hostids&quot;:&quot;{$HOST_ID}&quot;&#13;
+    },&#13;
+    &quot;auth&quot;:&quot;{sid}&quot;,&#13;
+    &quot;id&quot;:1&#13;
+}</posts>
+                            <variables>
+                                <variable>
+                                    <name>{hostmacroid}</name>
+                                    <value>regex:{&quot;hostmacroid&quot;:&quot;([0-9]+)&quot;[A-z0-9,&quot;:]+&quot;{\$MIKROTIK_VERSION}&quot;</value>
+                                </variable>
+                            </variables>
+                            <headers>
+                                <header>
+                                    <name>Content-Type</name>
+                                    <value>application/json-rpc</value>
+                                </header>
+                            </headers>
+                            <follow_redirects>NO</follow_redirects>
+                            <timeout>5s</timeout>
+                            <required>result</required>
+                        </step>
+                        <step>
+                            <name>Zabbix API - macros update</name>
+                            <url>{$ZABBIX_API_URL}</url>
+                            <posts>{&#13;
+    &quot;jsonrpc&quot;:&quot;2.0&quot;,&#13;
+    &quot;method&quot;:&quot;usermacro.update&quot;,&#13;
+    &quot;params&quot;:{&#13;
+        &quot;hostmacroid&quot;:&quot;{hostmacroid}&quot;,&#13;
+        &quot;value&quot;:&quot;{mikrotik_version}&quot;&#13;
+    },&#13;
+    &quot;auth&quot;:&quot;{sid}&quot;,&#13;
+    &quot;id&quot;:1&#13;
+}</posts>
+                            <headers>
+                                <header>
+                                    <name>Content-type</name>
+                                    <value>application/json-rpc</value>
+                                </header>
+                            </headers>
+                            <follow_redirects>NO</follow_redirects>
+                            <timeout>5s</timeout>
+                            <required>result</required>
+                        </step>
+                    </steps>
+                </httptest>
+            </httptests>
+            <macros>
+                <macro>
+                    <macro>{$ZABBIX_API_LOGIN}</macro>
+                    <value>ZabbixAMIAuthUpdater</value>
+                    <description>Zabbix API login</description>
+                </macro>
+                <macro>
+                    <macro>{$ZABBIX_API_PASSWORD}</macro>
+                    <value>ZabbixAMIAuthUpdater</value>
+                    <description>Zabbix API password</description>
+                </macro>
+                <macro>
+                    <macro>{$ZABBIX_API_URL}</macro>
+                    <value>https://localhost/api_jsonrpc.php</value>
+                    <description>Zabbix API URL</description>
+                </macro>
+            </macros>
+        </template>
+    </templates>
+    <triggers>
+        <trigger>
+            <expression>{Mikrotik - Actual Version:web.test.fail[Mikrotik - Actual Version].last(5m)}=2</expression>
+            <name>Zabbix API - authorization error</name>
+            <priority>WARNING</priority>
+        </trigger>
+        <trigger>
+            <expression>{Mikrotik - Actual Version:web.test.fail[Mikrotik - Actual Version].last(5m)}=3</expression>
+            <name>Zabbix API - macro search error</name>
+            <priority>WARNING</priority>
+        </trigger>
+        <trigger>
+            <expression>{Mikrotik - Actual Version:web.test.fail[Mikrotik - Actual Version].last(5m)}=4</expression>
+            <name>Zabbix API - macro update error</name>
+            <priority>WARNING</priority>
+        </trigger>
+    </triggers>
+</zabbix_export>
